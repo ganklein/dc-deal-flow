@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DC Deal Flow Fund — Intelligence Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#04070d;
+  --s1:#080e18;
+  --s2:#0c1520;
+  --s3:#111d2b;
+  --b1:#162033;
+  --b2:#1e2d45;
+  --b3:#253650;
+  --accent:#00ffaa;
+  --accent2:#00cc88;
+  --accent3:rgba(0,255,170,.07);
+  --gold:#f0b429;
+  --danger:#ff4d6a;
+  --blue:#3d9ef5;
+  --purple:#a78bfa;
+  --text:#c8d8ea;
+  --text2:#6b8299;
+  --text3:#344d63;
+  --syne:'Syne',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --body:'Instrument Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;overflow-x:hidden;}
+
+/* ── NOISE OVERLAY ── */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4;}
+
+/* ── GRID BACKGROUND ── */
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,170,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,170,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+/* ── HEADER ── */
+header{position:sticky;top:0;z-index:100;background:rgba(4,7,13,.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--b1);padding:0 2rem;height:56px;display:flex;align-items:center;gap:1.5rem;}
+.logo{font-family:var(--syne);font-size:13px;font-weight:800;color:var(--accent);letter-spacing:.15em;text-transform:uppercase;}
+.logo-sub{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.1em;margin-left:4px;}
+.nav{display:flex;gap:2px;margin-left:1rem;}
+.nb{padding:5px 14px;background:transparent;border:none;border-radius:4px;font-size:12px;font-family:var(--body);color:var(--text2);cursor:pointer;transition:all .2s;letter-spacing:.03em;}
+.nb:hover{color:var(--text);background:var(--s2);}
+.nb.active{color:var(--accent);background:var(--accent3);border:1px solid rgba(0,255,170,.15);}
+.nb .cnt{display:inline-block;margin-left:6px;background:var(--accent);color:#000;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;font-family:var(--mono);}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse-dot 2s infinite;box-shadow:0 0 8px var(--accent);}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+.live-label{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:.08em;}
+.refresh-btn{padding:5px 12px;background:transparent;border:1px solid var(--b2);border-radius:4px;color:var(--text2);font-size:11px;cursor:pointer;font-family:var(--mono);transition:all .2s;letter-spacing:.05em;}
+.refresh-btn:hover{border-color:var(--accent2);color:var(--accent);}
+
+/* ── PAGES ── */
+.page{display:none;position:relative;z-index:1;}
+.page.active{display:block;}
+.container{max-width:1400px;margin:0 auto;padding:2rem;}
+
+/* ── STATS ROW ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:2rem;}
+.stat-card{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:1.25rem 1.5rem;position:relative;overflow:hidden;transition:border-color .2s;}
+.stat-card:hover{border-color:var(--b2);}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent-color,var(--accent));opacity:.6;}
+.stat-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.stat-value{font-family:var(--syne);font-size:32px;font-weight:700;color:var(--text);line-height:1;}
+.stat-sub{font-size:12px;color:var(--text2);margin-top:6px;}
+
+/* ── PIPELINE TABLE ── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+.section-title{font-family:var(--syne);font-size:16px;font-weight:700;color:var(--text);letter-spacing:.02em;}
+.section-meta{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.filters-bar{display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.filter-input{background:var(--s1);border:1px solid var(--b1);border-radius:4px;padding:7px 12px;font-size:12px;color:var(--text);font-family:var(--body);outline:none;transition:border-color .2s;}
+.filter-input:focus{border-color:var(--b3);}
+.filter-input::placeholder{color:var(--text3);}
+.filter-select{background:var(--s1);border:1px solid var(--b1);border-radius:4px;padding:7px 10px;font-size:12px;color:var(--text2);font-family:var(--body);outline:none;cursor:pointer;}
+.filter-select:focus{border-color:var(--b3);}
+
+.pipeline-wrap{background:var(--s1);border:1px solid var(--b1);border-radius:8px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead{background:var(--s2);}
+th{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;padding:11px 14px;text-align:left;border-bottom:1px solid var(--b1);white-space:nowrap;cursor:pointer;user-select:none;transition:color .2s;}
+th:hover{color:var(--text2);}
+td{padding:12px 14px;border-bottom:1px solid var(--b1);font-size:13px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr.deal-row{cursor:pointer;transition:background .15s;}
+tr.deal-row:hover td{background:var(--s2);}
+tr.deal-row.selected td{background:rgba(0,255,170,.04);border-left:2px solid var(--accent);}
+
+.company-cell .co-name{font-family:var(--syne);font-size:13px;font-weight:600;color:var(--text);}
+.company-cell .co-loc{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px;}
+
+.stage-pill{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;letter-spacing:.05em;font-weight:500;}
+.s-pre{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.2);}
+.s-dev{background:rgba(240,180,41,.12);color:var(--gold);border:1px solid rgba(240,180,41,.2);}
+.s-ops{background:rgba(61,158,245,.12);color:var(--blue);border:1px solid rgba(61,158,245,.2);}
+.s-early{background:rgba(0,255,170,.1);color:var(--accent);border:1px solid rgba(0,255,170,.2);}
+
+.score-bar{display:flex;align-items:center;gap:6px;}
+.score-num{font-family:var(--mono);font-size:12px;font-weight:500;width:20px;}
+.score-track{flex:1;height:4px;background:var(--b1);border-radius:2px;overflow:hidden;min-width:40px;}
+.score-fill{height:100%;border-radius:2px;transition:width .3s;}
+
+.a2-pill{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;}
+.a2-flagged{background:rgba(240,180,41,.12);color:var(--gold);border:1px solid rgba(240,180,41,.2);}
+.a2-complete{background:rgba(0,255,170,.1);color:var(--accent);border:1px solid rgba(0,255,170,.2);}
+.a2-monitor{background:rgba(107,130,153,.1);color:var(--text2);border:1px solid var(--b1);}
+
+/* ── DEAL DETAIL PANEL ── */
+.detail-panel{position:fixed;top:56px;right:0;width:520px;height:calc(100vh - 56px);background:var(--s1);border-left:1px solid var(--b1);overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:50;}
+.detail-panel.open{transform:translateX(0);}
+.panel-header{padding:1.5rem;border-bottom:1px solid var(--b1);position:sticky;top:0;background:var(--s1);z-index:10;}
+.panel-close{position:absolute;top:1.25rem;right:1.25rem;background:transparent;border:1px solid var(--b2);border-radius:4px;color:var(--text2);width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.panel-close:hover{border-color:var(--danger);color:var(--danger);}
+.panel-company{font-family:var(--syne);font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.panel-loc{font-family:var(--mono);font-size:11px;color:var(--text2);}
+.panel-body{padding:1.5rem;}
+.panel-section{margin-bottom:1.5rem;}
+.panel-section-title{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--b1);}
+.panel-field{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(22,32,51,.5);}
+.panel-field:last-child{border-bottom:none;}
+.pf-label{font-size:12px;color:var(--text2);flex-shrink:0;width:130px;}
+.pf-value{font-size:12px;color:var(--text);text-align:right;font-family:var(--mono);}
+.report-text{font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word;background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:1rem;max-height:400px;overflow-y:auto;}
+.score-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.score-item{background:var(--s2);border:1px solid var(--b1);border-radius:6px;padding:.75rem;}
+.si-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.si-val{font-family:var(--syne);font-size:24px;font-weight:700;}
+.rec-box{border-radius:6px;padding:1rem;text-align:center;}
+.rec-pursue{background:rgba(0,255,170,.08);border:1px solid rgba(0,255,170,.2);}
+.rec-monitor{background:rgba(240,180,41,.08);border:1px solid rgba(240,180,41,.2);}
+.rec-pass{background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.2);}
+.rec-label{font-family:var(--syne);font-size:18px;font-weight:800;letter-spacing:.1em;}
+
+/* ── REPORTS PAGE ── */
+.reports-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;}
+.report-card{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:1.25rem;transition:all .2s;cursor:pointer;position:relative;overflow:hidden;}
+.report-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);opacity:0;transition:opacity .2s;}
+.report-card:hover{border-color:var(--b2);}
+.report-card:hover::before{opacity:1;}
+.rc-company{font-family:var(--syne);font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.rc-date{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:12px;}
+.rc-preview{font-size:12px;color:var(--text2);line-height:1.6;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
+.rc-footer{margin-top:12px;padding-top:10px;border-top:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;}
+.rc-read{font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:.06em;}
+
+/* ── FULL REPORT MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(4,7,13,.95);z-index:200;overflow-y:auto;}
+.modal-overlay.open{display:block;}
+.modal-content{max-width:900px;margin:2rem auto;padding:2rem;background:var(--s1);border:1px solid var(--b1);border-radius:10px;position:relative;}
+.modal-close{position:absolute;top:1.5rem;right:1.5rem;background:transparent;border:1px solid var(--b2);border-radius:4px;color:var(--text2);width:32px;height:32px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.modal-close:hover{border-color:var(--danger);color:var(--danger);}
+.modal-title{font-family:var(--syne);font-size:24px;font-weight:800;color:var(--text);margin-bottom:4px;}
+.modal-sub{font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:1.5rem;}
+.modal-report{font-size:13px;color:var(--text2);line-height:1.8;white-space:pre-wrap;word-break:break-word;}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:5rem 2rem;color:var(--text3);}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.3;}
+.empty-text{font-size:14px;}
+
+/* ── LOADING ── */
+.loading{text-align:center;padding:4rem;color:var(--text3);}
+.loading-spinner{width:32px;height:32px;border:2px solid var(--b2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:var(--mono);font-size:12px;letter-spacing:.08em;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--b3);}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .detail-panel{width:100%;top:auto;bottom:0;height:70vh;transform:translateY(100%);border-left:none;border-top:1px solid var(--b1);}
+  .detail-panel.open{transform:translateY(0);}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="logo">DC Deal Flow</span>
+    <span class="logo-sub">// Fund Intelligence</span>
+  </div>
+  <nav class="nav">
+    <button class="nb active" onclick="goto('pipeline',this)">Pipeline</button>
+    <button class="nb" onclick="goto('reports',this)" id="reportsBtn">Reports</button>
+  </nav>
+  <div class="hdr-right">
+    <div class="live-dot"></div>
+    <span class="live-label">LIVE DATA</span>
+    <button class="refresh-btn" onclick="loadAll()">↻ REFRESH</button>
+  </div>
+</header>
+
+<!-- ═══ PIPELINE PAGE ═══ -->
+<div class="page active" id="page-pipeline">
+  <div class="container">
+
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card" style="--accent-color:var(--accent)">
+        <div class="stat-label">Total Deals</div>
+        <div class="stat-value" id="st-total">—</div>
+        <div class="stat-sub">In pipeline</div>
+      </div>
+      <div class="stat-card" style="--accent-color:var(--gold)">
+        <div class="stat-label">Flagged for A2</div>
+        <div class="stat-value" id="st-flagged">—</div>
+        <div class="stat-sub">Deep dive queue</div>
+      </div>
+      <div class="stat-card" style="--accent-color:var(--blue)">
+        <div class="stat-label">Avg Fit Score</div>
+        <div class="stat-value" id="st-fit">—</div>
+        <div class="stat-sub">Out of 10</div>
+      </div>
+      <div class="stat-card" style="--accent-color:var(--purple)">
+        <div class="stat-label">Reports Done</div>
+        <div class="stat-value" id="st-reports">—</div>
+        <div class="stat-sub">Agent 2 analyses</div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">Deal Pipeline</div>
+      <div class="section-meta" id="lastUpdated">Loading...</div>
+    </div>
+
+    <div class="filters-bar">
+      <input class="filter-input" style="flex:2;min-width:200px" type="text" id="searchInput" placeholder="Search company, location..." oninput="filterDeals()"/>
+      <select class="filter-select" id="stageFilter" onchange="filterDeals()">
+        <option value="">All stages</option>
+        <option value="pre-development">Pre-development</option>
+        <option value="development">Development</option>
+        <option value="early-operational">Early operational</option>
+        <option value="operational">Operational</option>
+      </select>
+      <select class="filter-select" id="a2Filter" onchange="filterDeals()">
+        <option value="">All statuses</option>
+        <option value="Flagged">Flagged for A2</option>
+        <option value="Monitoring">Monitoring</option>
+        <option value="Complete">Complete</option>
+      </select>
+      <select class="filter-select" id="sortFilter" onchange="filterDeals()">
+        <option value="fit">Sort: Fit Score</option>
+        <option value="earliness">Sort: Earliness</option>
+        <option value="combined">Sort: Combined</option>
+        <option value="date">Sort: Date</option>
+        <option value="company">Sort: Company</option>
+      </select>
+    </div>
+
+    <div class="pipeline-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Type</th>
+            <th>MW</th>
+            <th>Capital</th>
+            <th>Earliness</th>
+            <th>Fit</th>
+            <th>Status</th>
+            <th>Found</th>
+          </tr>
+        </thead>
+        <tbody id="pipelineBody">
+          <tr><td colspan="8"><div class="loading"><div class="loading-spinner"></div><div class="loading-text">LOADING PIPELINE...</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ REPORTS PAGE ═══ -->
+<div class="page" id="page-reports">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-title">Agent 2 — Deal Reports</div>
+      <div class="section-meta">Full value chain analysis per deal</div>
+    </div>
+    <div class="reports-grid" id="reportsGrid">
+      <div class="loading"><div class="loading-spinner"></div><div class="loading-text">LOADING REPORTS...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DEAL DETAIL PANEL ═══ -->
+<div class="detail-panel" id="detailPanel">
+  <div class="panel-header">
+    <button class="panel-close" onclick="closePanel()">×</button>
+    <div class="panel-company" id="panelCompany">—</div>
+    <div class="panel-loc" id="panelLoc">—</div>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<!-- ═══ FULL REPORT MODAL ═══ -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-title" id="modalTitle">—</div>
+    <div class="modal-sub" id="modalSub">—</div>
+    <div class="modal-report" id="modalReport"></div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '1j4mfi8RdeaA2BYkYDaYQhhMHBhBWu2G8hKwf-Zawo2M';
+const BASE = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&sheet=';
+
+let allDeals = [];
+let allReports = [];
+let selectedRow = null;
+
+// ── Navigation ──────────────────────────────────────
+function goto(page, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  btn.classList.add('active');
+  closePanel();
+}
+
+// ── Data Loading ─────────────────────────────────────
+async function fetchSheet(tab){
+  const res = await fetch(BASE + encodeURIComponent(tab));
+  const text = await res.text();
+  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/)[1]);
+  return json.table;
+}
+
+function parseRows(table){
+  if(!table||!table.rows) return [];
+  return table.rows.map(row=>
+    (table.cols||[]).reduce((obj,col,i)=>{
+      obj[col.label||col.id||'col'+i] = row.c&&row.c[i]&&row.c[i].v!=null ? row.c[i].v : '';
+      return obj;
+    },{})
+  );
+}
+
+async function loadAll(){
+  document.getElementById('lastUpdated').textContent = 'Refreshing...';
+  try{
+    // Load Pipeline
+    const pt = await fetchSheet('Pipeline');
+    allDeals = parseRows(pt);
+    renderPipeline(allDeals);
+    updateStats();
+
+    // Load Reports
+    const rt = await fetchSheet('Deal Reports');
+    allReports = parseRows(rt);
+    renderReports(allReports);
+
+    document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    document.getElementById('reportsBtn').innerHTML = 'Reports<span class="cnt">'+allReports.length+'</span>';
+  }catch(e){
+    document.getElementById('lastUpdated').textContent = 'Error loading data';
+    document.getElementById('pipelineBody').innerHTML = '<tr><td colspan="8"><div class="empty"><div class="empty-icon">⚠</div><div class="empty-text">Could not load data. Make sure your Google Sheet is shared publicly.</div></div></td></tr>';
+    console.error(e);
+  }
+}
+
+// ── Stats ─────────────────────────────────────────────
+function updateStats(){
+  document.getElementById('st-total').textContent = allDeals.length;
+  const flagged = allDeals.filter(d=>(d['A2 Status']||'').includes('Flagged')||d['A2 Status']==='Flagged for A2').length;
+  document.getElementById('st-flagged').textContent = flagged;
+  const fits = allDeals.map(d=>parseFloat(d['Fit Score'])||0).filter(v=>v>0);
+  const avgFit = fits.length ? (fits.reduce((a,b)=>a+b,0)/fits.length).toFixed(1) : '—';
+  document.getElementById('st-fit').textContent = avgFit;
+  document.getElementById('st-reports').textContent = allReports.length;
+}
+
+// ── Pipeline Render ───────────────────────────────────
+function stageClass(stage){
+  const s=(stage||'').toLowerCase();
+  if(s.includes('pre')) return 's-pre';
+  if(s.includes('early')) return 's-early';
+  if(s.includes('dev')) return 's-dev';
+  if(s.includes('oper')) return 's-ops';
+  return 's-dev';
+}
+
+function scoreColor(v){
+  if(v>=8) return 'var(--accent)';
+  if(v>=6) return 'var(--gold)';
+  if(v>=4) return 'var(--blue)';
+  return 'var(--danger)';
+}
+
+function renderScoreBar(val){
+  const v=parseFloat(val)||0;
+  const color=scoreColor(v);
+  return `<div class="score-bar">
+    <span class="score-num" style="color:${color}">${v||'—'}</span>
+    <div class="score-track"><div class="score-fill" style="width:${v*10}%;background:${color}"></div></div>
+  </div>`;
+}
+
+function a2Class(status){
+  const s=(status||'').toLowerCase();
+  if(s.includes('flag')) return 'a2-flagged';
+  if(s.includes('complete')) return 'a2-complete';
+  return 'a2-monitor';
+}
+
+function filterDeals(){
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const stage = document.getElementById('stageFilter').value.toLowerCase();
+  const a2 = document.getElementById('a2Filter').value.toLowerCase();
+  const sort = document.getElementById('sortFilter').value;
+
+  let data = [...allDeals];
+  if(search) data = data.filter(d=>
+    (d['Company']||'').toLowerCase().includes(search)||
+    (d['Location']||'').toLowerCase().includes(search)||
+    (d['DC Type']||'').toLowerCase().includes(search)
+  );
+  if(stage) data = data.filter(d=>(d['Stage']||'').toLowerCase().includes(stage));
+  if(a2) data = data.filter(d=>(d['A2 Status']||'').toLowerCase().includes(a2));
+
+  if(sort==='fit') data.sort((a,b)=>(parseFloat(b['Fit Score'])||0)-(parseFloat(a['Fit Score'])||0));
+  else if(sort==='earliness') data.sort((a,b)=>(parseFloat(b['Earliness Score'])||0)-(parseFloat(a['Earliness Score'])||0));
+  else if(sort==='combined') data.sort((a,b)=>((parseFloat(b['Fit Score'])||0)+(parseFloat(b['Earliness Score'])||0))-((parseFloat(a['Fit Score'])||0)+(parseFloat(a['Earliness Score'])||0)));
+  else if(sort==='company') data.sort((a,b)=>(a['Company']||'').localeCompare(b['Company']||''));
+
+  renderPipeline(data);
+}
+
+function renderPipeline(data){
+  if(!data.length){
+    document.getElementById('pipelineBody').innerHTML = '<tr><td colspan="8"><div class="empty"><div class="empty-icon">📡</div><div class="empty-text">No deals match your filters</div></div></td></tr>';
+    return;
+  }
+  document.getElementById('pipelineBody').innerHTML = data.map((d,i)=>{
+    const company = d['Company']||'—';
+    const loc = d['Location']||'—';
+    const stage = d['Stage']||'—';
+    const type = d['DC Type']||'—';
+    const mw = d['Power MW']||'—';
+    const cap = d['Capital']||'—';
+    const earliness = d['Earliness Score']||'—';
+    const fit = d['Fit Score']||'—';
+    const a2 = d['A2 Status']||'Monitoring';
+    const found = d['Date Found']||'—';
+    const sc = stageClass(stage);
+    const ac = a2Class(a2);
+    return `<tr class="deal-row" onclick="selectDeal(${allDeals.indexOf(d)},this)">
+      <td><div class="company-cell"><div class="co-name">${company}</div><div class="co-loc">${loc}</div></div></td>
+      <td style="font-size:12px;color:var(--text2)">${type}</td>
+      <td style="font-family:var(--mono);font-size:12px">${mw}</td>
+      <td style="font-size:12px;color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cap}</td>
+      <td>${renderScoreBar(earliness)}</td>
+      <td>${renderScoreBar(fit)}</td>
+      <td><span class="a2-pill ${ac}">${a2}</span></td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--text3);white-space:nowrap">${found}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Deal Detail Panel ─────────────────────────────────
+function selectDeal(idx, row){
+  if(selectedRow) selectedRow.classList.remove('selected');
+  selectedRow = row;
+  row.classList.add('selected');
+  const d = allDeals[idx];
+  document.getElementById('panelCompany').textContent = d['Company']||'—';
+  document.getElementById('panelLoc').textContent = (d['Location']||'—') + ' · ' + (d['Stage']||'—');
+
+  const e = parseFloat(d['Earliness Score'])||0;
+  const f = parseFloat(d['Fit Score'])||0;
+  const combined = e+f;
+  const recommendation = combined>=14?'PURSUE':combined>=10?'MONITOR':'PASS';
+  const recClass = recommendation==='PURSUE'?'rec-pursue':recommendation==='MONITOR'?'rec-monitor':'rec-pass';
+  const recColor = recommendation==='PURSUE'?'var(--accent)':recommendation==='MONITOR'?'var(--gold)':'var(--danger)';
+
+  // Find matching report
+  const report = allReports.find(r=>(r['Company']||r[Object.keys(r)[0]]||'').toLowerCase().includes((d['Company']||'').toLowerCase()));
+
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-section">
+      <div class="panel-section-title">Deal Overview</div>
+      ${[
+        ['Stage', d['Stage']||'—'],
+        ['DC Type', d['DC Type']||'—'],
+        ['Power MW', d['Power MW']||'—'],
+        ['Capital', d['Capital']||'—'],
+        ['Signal Source', d['Signal Source']||'—'],
+        ['Source Date', d['Source Date']||'—'],
+        ['Date Found', d['Date Found']||'—'],
+      ].map(([l,v])=>`<div class="panel-field"><span class="pf-label">${l}</span><span class="pf-value">${v}</span></div>`).join('')}
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">Scores</div>
+      <div class="score-grid">
+        <div class="score-item">
+          <div class="si-label">Earliness</div>
+          <div class="si-val" style="color:${scoreColor(e)}">${e}/10</div>
+        </div>
+        <div class="score-item">
+          <div class="si-label">Fit</div>
+          <div class="si-val" style="color:${scoreColor(f)}">${f}/10</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">Recommendation</div>
+      <div class="rec-box ${recClass}">
+        <div class="rec-label" style="color:${recColor}">${recommendation}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">Combined score: ${combined}/20</div>
+      </div>
+    </div>
+
+    ${d['Key Contacts']?`<div class="panel-section">
+      <div class="panel-section-title">Key Contacts</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.8">${(d['Key Contacts']||'').replace(/\|/g,'<br/>')}</div>
+    </div>`:''}
+
+    ${d['Source URL']?`<div class="panel-section">
+      <div class="panel-section-title">Source</div>
+      <a href="${d['Source URL']}" target="_blank" style="font-size:12px;color:var(--accent2);text-decoration:none;font-family:var(--mono);word-break:break-all">${d['Source URL']}</a>
+    </div>`:''}
+
+    ${d['Notes']?`<div class="panel-section">
+      <div class="panel-section-title">Notes</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6">${d['Notes']}</div>
+    </div>`:''}
+
+    ${report?`<div class="panel-section">
+      <div class="panel-section-title">Agent 2 Report Available</div>
+      <button onclick="openReport('${(d['Company']||'').replace(/'/g,"\\'")}')" style="width:100%;padding:10px;background:var(--accent3);border:1px solid rgba(0,255,170,.2);border-radius:6px;color:var(--accent);font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:.06em;transition:all .2s" onmouseover="this.style.background='rgba(0,255,170,.12)'" onmouseout="this.style.background='var(--accent3)'">VIEW FULL REPORT →</button>
+    </div>`:''}
+  `;
+
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+function closePanel(){
+  document.getElementById('detailPanel').classList.remove('open');
+  if(selectedRow){ selectedRow.classList.remove('selected'); selectedRow=null; }
+}
+
+// ── Reports ───────────────────────────────────────────
+function renderReports(data){
+  if(!data.length){
+    document.getElementById('reportsGrid').innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No reports yet — run the agents to generate reports</div></div>';
+    return;
+  }
+  const cols = data.length ? Object.keys(data[0]) : [];
+  document.getElementById('reportsGrid').innerHTML = data.map(r=>{
+    const company = r[cols[0]]||r['Company']||'Unknown';
+    const date = r[cols[1]]||r['Date']||'—';
+    const reportText = r[cols[2]]||r['Report']||'';
+    const preview = reportText.slice(0,300);
+    return `<div class="report-card" onclick="openReportFromData('${company.replace(/'/g,"\\'")}','${date}','${reportText.replace(/'/g,"\\'").replace(/\n/g,'\\n').slice(0,50000)}')">
+      <div class="rc-company">${company}</div>
+      <div class="rc-date">${date}</div>
+      <div class="rc-preview">${preview}...</div>
+      <div class="rc-footer">
+        <span class="rc-read">READ FULL REPORT →</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${Math.ceil(reportText.length/1000)}k chars</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openReport(company){
+  const report = allReports.find(r=>{
+    const cols = Object.keys(r);
+    return (r[cols[0]]||r['Company']||'').toLowerCase().includes(company.toLowerCase());
+  });
+  if(!report) return;
+  const cols = Object.keys(report);
+  openReportFromData(report[cols[0]]||company, report[cols[1]]||'—', report[cols[2]]||'');
+}
+
+function openReportFromData(company, date, text){
+  document.getElementById('modalTitle').textContent = company;
+  document.getElementById('modalSub').textContent = 'Agent 2 Deep Dive · ' + date;
+  document.getElementById('modalReport').textContent = text.replace(/\\n/g,'\n');
+  document.getElementById('reportModal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('reportModal').classList.remove('open');
+}
+
+// Close modal on overlay click
+document.getElementById('reportModal').addEventListener('click', function(e){
+  if(e.target === this) closeModal();
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeModal(); closePanel(); }
+});
+
+// ── Init ─────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>
